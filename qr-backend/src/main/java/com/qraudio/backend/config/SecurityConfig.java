@@ -23,7 +23,8 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 // Nhóm 1: Khách tham quan
-                .requestMatchers("/api/exhibits/**", "/api/qrcodes/resolve/**").permitAll()
+                .requestMatchers("/api/exhibits/**", "/api/qrcodes/resolve/**", "/api/auth/login", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 
                 // Nhóm 2: Admin
                 .anyRequest().authenticated()
