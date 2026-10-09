@@ -19,7 +19,7 @@ public class VoiceRssService {
     // Hàm gọi API VoiceRSS tạo file âm thanh từ văn bản
     public byte[] generateAudio(String text, String languageCode) {
         String url = UriComponentsBuilder.fromUriString(apiUrl)
-                .queryParam("key", apiKey)
+                .queryParam("key", apiKey)                  // Khóa API
                 .queryParam("hl", languageCode)             // Ngôn ngữ bản dịch
                 .queryParam("src", text)                    // Nội dung văn bản
                 .queryParam("c", "MP3")                     // Định dạng MP3
