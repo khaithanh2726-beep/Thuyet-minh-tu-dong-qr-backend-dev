@@ -1,5 +1,8 @@
 server:
   port: ${SERVER_PORT:8080}
+voicerss:
+  api-key: "d11db342b5cb4dc6bba9b5564d212d17"
+  url: http://api.voicerss.org/
 spring:
   application:
     name: qr-backend
