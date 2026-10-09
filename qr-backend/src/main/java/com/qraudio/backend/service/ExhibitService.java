@@ -12,10 +12,12 @@ import org.springframework.stereotype.Service;
 public class ExhibitService {
     private final ExhibitRepository exhibitRepository;
     private final ExhibitTranslationRepository translationRepository;
+    private final AudioService audioService;
 
-    public ExhibitService(ExhibitRepository exhibitRepository, ExhibitTranslationRepository translationRepository) {
+    public ExhibitService(ExhibitRepository exhibitRepository, ExhibitTranslationRepository translationRepository, AudioService audioService) {
         this.exhibitRepository = exhibitRepository;
         this.translationRepository = translationRepository;
+        this.audioService = audioService;
     }
 
     // Hàm gọi API lấy hiện vật và bản dịch
@@ -28,12 +30,15 @@ public class ExhibitService {
         ExhibitTranslation translation = translationRepository.findByExhibitIdAndLanguageCode(id, languageCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không có bản dịch cho ngôn ngữ: " + languageCode));
 
+        // Gọi AudioService lấy file bản dịch
+        String audioUrl = audioService.getOrGenerateAudio(translation);
         return new ExhibitResponse(
                 exhibit.getId(),
                 exhibit.getImageUrl(),
                 translation.getLanguageCode(),
                 translation.getTitle(),
-                translation.getContent()
+                translation.getContent(),
+                audioUrl
         );
     }
 }
