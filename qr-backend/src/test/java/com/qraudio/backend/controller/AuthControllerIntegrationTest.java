@@ -1,51 +1,98 @@
 package com.qraudio.backend.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.qraudio.backend.dto.AuthRequest;
 import com.qraudio.backend.entity.User;
 import com.qraudio.backend.repository.UserRepository;
+import com.qraudio.backend.security.JwtTokenUtil;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import java.util.Optional;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AuthControllerIntegrationTest {
-    @Autowired
-    private MockMvc mockMvc;
-    @Autowired
-    private ObjectMapper objectMapper;
-    @MockitoBean
-    private UserRepository userRepository;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private UserRepository userRepository;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JwtTokenUtil jwtTokenUtil;
+
+    @BeforeEach
+    void setUp() {
+        userRepository.deleteAll();
+        User user = new User();
+        user.setUsername("testadmin");
+        user.setPasswordHash(passwordEncoder.encode("TestPass123!"));
+        user.setRole("ADMIN");
+        user.setActive(true);
+        userRepository.saveAndFlush(user);
+    }
 
     @Test
     void login_WithValidCredentials_ReturnsToken() throws Exception {
-        // Giả lập dữ liệu trong DB
-        User mockUser = new User();
-        mockUser.setUsername("testadmin");
-        mockUser.setPasswordHash(passwordEncoder.encode("123456"));
-        when(userRepository.findByUsername("testadmin")).thenReturn(Optional.of(mockUser));
-        AuthRequest request = new AuthRequest();
-        request.setUsername("testadmin");
-        request.setPassword("123456");
-
-        // Gọi API và kiểm tra
-        mockMvc.perform(post("/api/auth/login")
+        var result = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content("""
+                        {"username":"testadmin","password":"TestPass123!"}
+                        """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.token").exists());
+                .andExpect(jsonPath("$.data.token").isString())
+                .andExpect(jsonPath("$.data.password").doesNotExist())
+                .andReturn();
+        String token = com.jayway.jsonpath.JsonPath.read(
+                result.getResponse().getContentAsString(), "$.data.token");
+        User user = userRepository.findByUsername("testadmin").orElseThrow();
+        assertEquals(user.getId(), jwtTokenUtil.getClaimsFromToken(token).get("uid", Long.class));
+        assertEquals(0L, jwtTokenUtil.getClaimsFromToken(token).get("ver", Long.class));
+    }
+
+    @Test
+    void wrongPassword_ReturnsHttp401() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"username":"testadmin","password":"wrong"}
+                        """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.data.token").doesNotExist());
+    }
+
+    @Test
+    void unknownUsername_ReturnsHttp401() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"username":"missing","password":"TestPass123!"}
+                        """)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void disabledAccount_CannotLogin() throws Exception {
+        User user = userRepository.findByUsername("testadmin").orElseThrow();
+        user.setActive(false);
+        userRepository.saveAndFlush(user);
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"username":"testadmin","password":"TestPass123!"}
+                        """)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void missingCredentials_Returns400() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void malformedJson_Returns400() throws Exception {
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("{"))
+                .andExpect(status().isBadRequest());
     }
 }

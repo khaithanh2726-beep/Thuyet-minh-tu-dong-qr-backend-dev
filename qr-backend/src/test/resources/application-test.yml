@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:qr_backend_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+security:
+  jwt:
+    # Public fixture key used only by automated tests.
+    secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    expiration-ms: 86400000
+
+voicerss:
+  api-key: unused-test-key
+  url: https://example.invalid/tts

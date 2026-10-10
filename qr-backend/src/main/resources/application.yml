@@ -20,3 +20,7 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
