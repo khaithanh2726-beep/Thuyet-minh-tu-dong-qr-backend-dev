@@ -7,6 +7,7 @@ import com.qraudio.backend.exception.ResourceNotFoundException;
 import com.qraudio.backend.repository.ExhibitRepository;
 import com.qraudio.backend.repository.ExhibitTranslationRepository;
 import org.springframework.stereotype.Service;
+import java.util.Locale;
 
 @Service
 public class ExhibitService {
@@ -26,8 +27,13 @@ public class ExhibitService {
         Exhibit exhibit = exhibitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hiện vật với ID: " + id));
 
+        if (!exhibit.isActive()) {
+            throw new ResourceNotFoundException("Hiện vật hiện không được trưng bày");
+        }
+
         // Tìm bản dịch tương ứng, nếu không có thì ném lỗi 404
-        ExhibitTranslation translation = translationRepository.findByExhibitIdAndLanguageCode(id, languageCode)
+        ExhibitTranslation translation = translationRepository.findByExhibitIdAndLanguageCode(
+                        id, languageCode.toLowerCase(Locale.ROOT))
                 .orElseThrow(() -> new ResourceNotFoundException("Không có bản dịch cho ngôn ngữ: " + languageCode));
 
         // Gọi AudioService lấy file bản dịch

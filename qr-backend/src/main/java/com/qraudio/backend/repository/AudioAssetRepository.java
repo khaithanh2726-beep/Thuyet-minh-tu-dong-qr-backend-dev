@@ -8,4 +8,5 @@ import java.util.Optional;
 @Repository
 public interface AudioAssetRepository extends JpaRepository<AudioAsset, Long> {
     Optional<AudioAsset> findByTranslationIdAndContentHashAndFormat(Long translationId, String contentHash, String format);
+    void deleteByTranslationId(Long translationId);
 }

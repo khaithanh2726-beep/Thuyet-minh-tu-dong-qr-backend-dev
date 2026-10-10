@@ -8,7 +8,9 @@ public class Exhibit {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;            // Id hiện vật
+    @Column(length = 1000)
     private String imageUrl;    // Link ảnh hiện vật
+    @Column(nullable = false)
     private boolean isActive;   // Trạng thái hiện vật (true: đang trưng bày, false: đang cất)
 
     public Long getId() { return id; }

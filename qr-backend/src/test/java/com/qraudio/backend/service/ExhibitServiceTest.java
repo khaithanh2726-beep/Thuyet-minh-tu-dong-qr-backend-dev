@@ -39,6 +39,7 @@ class ExhibitServiceTest {
         String lang = "vi-vn";
         Exhibit exhibit = new Exhibit();
         exhibit.setId(exhibitId);
+        exhibit.setActive(true);
         exhibit.setImageUrl("test.png");
         ExhibitTranslation translation = new ExhibitTranslation();
         translation.setLanguageCode(lang);
