@@ -1,0 +1,116 @@
+name: CI-CD
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: qr-backend/pom.xml
+      - name: Build and test
+        working-directory: qr-backend
+        run: |
+          chmod +x mvnw
+          ./mvnw -B verify
+      - name: Verify Docker stack with MySQL and Flyway
+        working-directory: qr-backend
+        shell: bash
+        run: |
+          export MYSQL_PASSWORD="$(openssl rand -hex 24)"
+          export MYSQL_ROOT_PASSWORD="$(openssl rand -hex 24)"
+          export JWT_SECRET="$(openssl rand -base64 32)"
+          export BOOTSTRAP_ADMIN_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$MYSQL_PASSWORD"
+          echo "::add-mask::$MYSQL_ROOT_PASSWORD"
+          echo "::add-mask::$JWT_SECRET"
+          echo "::add-mask::$BOOTSTRAP_ADMIN_PASSWORD"
+          docker compose up -d --build --wait --wait-timeout 240
+          curl --fail --silent http://localhost:8080/api/health
+          curl --fail --silent http://localhost:8080/api/qrcodes/DEMO-BRONZE-DRUM | python3 -c 'import json,sys; assert len(json.load(sys.stdin)["data"]["exhibit"]["languages"]) == 2'
+          curl --fail --silent http://localhost:8080/api/qrcodes/DEMO-BRONZE-DRUM/image -o /tmp/demo-qr.png
+          python3 -c 'from pathlib import Path; assert Path("/tmp/demo-qr.png").read_bytes().startswith(bytes([137,80,78,71,13,10,26,10]))'
+      - name: Stop CI containers
+        if: always()
+        working-directory: qr-backend
+        env:
+          MYSQL_PASSWORD: cleanup-placeholder
+          MYSQL_ROOT_PASSWORD: cleanup-placeholder
+          JWT_SECRET: cleanup-placeholder
+          BOOTSTRAP_ADMIN_PASSWORD: cleanup-placeholder
+        run: docker compose down
+  image:
+    needs: ci
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.name.outputs.image }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - id: name
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: echo "image=ghcr.io/${REPOSITORY,,}:$SHA" >> "$GITHUB_OUTPUT"
+      - name: Build and publish image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: ${{ github.actor }}
+          IMAGE: ${{ steps.name.outputs.image }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USER" --password-stdin
+          docker build -t "$IMAGE" qr-backend
+          docker push "$IMAGE"
+      - name: Logout
+        if: always()
+        run: docker logout ghcr.io
+  deploy-dev:
+    needs: image
+    if: vars.DEV_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Windows, X64, qr-dev]
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Deploy to DEV Docker
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USER: ${{ github.actor }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          DEV_ENV_FILE: ${{ vars.DEV_ENV_FILE }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:GH_TOKEN | docker login ghcr.io -u $env:GH_USER --password-stdin
+          if ($LASTEXITCODE -ne 0) { throw 'Registry login failed' }
+          try { & ./scripts/Deploy-Dev.ps1 -Image $env:IMAGE -EnvFile $env:DEV_ENV_FILE }
+          finally { docker logout ghcr.io }
