@@ -18,7 +18,12 @@ public class PublicUrlService {
         }
     }
     public String qrMetadata(String code) {
-        String origin = base.isBlank() ? ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString() : base;
-        return origin + "/api/qrcodes/" + code;
+        return origin() + "/api/qrcodes/" + code;
+    }
+    public String qrAudio(String code, String language) {
+        return origin() + "/api/qrcodes/" + code + "/audio?lang=" + Languages.requireSupported(language);
+    }
+    private String origin() {
+        return base.isBlank() ? ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString() : base;
     }
 }

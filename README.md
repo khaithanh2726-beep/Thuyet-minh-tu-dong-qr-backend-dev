@@ -4,6 +4,8 @@ Backend đồ án Công nghệ phần mềm cung cấp API hiện vật, bản d
 
 Luồng tích hợp: đọc mã QR → lấy thông tin và ngôn ngữ hiện vật qua API → gọi API với ngôn ngữ đã chọn → nhận nội dung cùng `audioUrl` → tải MP3 từ `audioUrl`. Việc hiển thị nút chọn ngôn ngữ và trình phát thuộc ứng dụng sử dụng API.
 
+Luồng nghe trực tiếp bằng điện thoại: chọn hiện vật và ngôn ngữ trong Swagger → tải QR riêng cho ngôn ngữ đó → quét QR → trình duyệt mở MP3 bằng trình phát có sẵn. Có thể cần bấm ▶ để bắt đầu nghe. Backend không cung cấp trang chọn ngôn ngữ sau khi quét.
+
 Java 21 · Spring Boot 4.1.1 · Maven · MySQL · Flyway · Spring Security/JWT · VoiceRSS · ZXing · Docker · GitHub Actions.
 
 ## Chạy bằng Docker trên Windows
@@ -59,7 +61,19 @@ docker compose up -d --wait --wait-timeout 240
 
 Nội dung và SVG là dữ liệu trình diễn, không phải hồ sơ khoa học của hiện vật thật. Mẫu đã tồn tại sẽ được giữ nguyên, kể cả bản dịch đã sửa hoặc QR đã vô hiệu hóa. Các ID được database tự cấp. Dữ liệu từ migration cũ vẫn được giữ nên bộ sưu tập có thể có thêm hiện vật cũ.
 
-PNG chứa URL tuyệt đối của API metadata, ghép từ `PUBLIC_BASE_URL` và đường dẫn trong bảng. API metadata trả các bản dịch có sẵn và không gọi VoiceRSS. Đổi `PUBLIC_BASE_URL` cần tải lại PNG; ảnh đã in không tự đổi địa chỉ. Nếu quét bằng camera điện thoại rồi mở URL, kết quả là JSON của backend.
+PNG tải từ `GET /api/qrcodes/{code}/image` không có `lang` chứa URL tuyệt đối của API metadata trong bảng. API metadata trả các bản dịch có sẵn và không gọi VoiceRSS. Thêm `?lang=vi-vn` hoặc `?lang=en-us` để tạo QR nghe trực tiếp cho ngôn ngữ đó. URL trong QR lúc này là `/api/qrcodes/{code}/audio?lang=...`, ghép với `PUBLIC_BASE_URL`. Một mã hiện vật có nhiều ảnh QR theo ngôn ngữ, không cần tạo thêm bản ghi database. Tạo PNG không gọi VoiceRSS.
+
+Đổi `PUBLIC_BASE_URL` cần tải lại PNG; ảnh đã in không tự đổi địa chỉ. Quét ảnh không có `lang` mở JSON; quét ảnh có `lang` mở MP3. Sửa nội dung bản dịch vẫn dùng được QR cũ và tạo audio mới; vô hiệu hóa QR/hiện vật hoặc xóa bản dịch làm URL nghe trả 404. Ngôn ngữ không hợp lệ/không được hỗ trợ trả 400.
+
+### Tạo QR Việt/Anh và quét bằng điện thoại
+
+1. Trong Swagger, gọi `GET /api/catalog`, chọn hiện vật và lấy `data[].qrCode`. Danh sách `languages` của hiện vật cho biết những bản dịch có sẵn.
+2. Mở nhóm **Public - QR**, chọn `GET /api/qrcodes/{code}/image`, bấm **Try it out**. Nhập `code=DEMO-OIL-LAMP`, `lang=vi-vn`, bấm **Execute**. Mở/tải PNG từ response để hiển thị trên máy tính.
+3. Làm lại với `lang=en-us` để lấy ảnh QR tiếng Anh. Hai ảnh chứa hai URL nghe khác nhau. Có thể mở trực tiếp trên trình duyệt máy tính: `http://localhost:<APP_PORT>/api/qrcodes/DEMO-OIL-LAMP/image?lang=vi-vn` hoặc đổi thành `lang=en-us`.
+4. Điện thoại cùng Wi-Fi mở thử `http://<IP-LAN-của-máy>:<APP_PORT>/api/health`, phải thấy `UP`. Nếu không truy cập được, kiểm tra IP Wi-Fi thực tế, cổng, tường lửa và khả năng kết nối giữa hai thiết bị. Không dùng localhost hoặc IP VPN trong `PUBLIC_BASE_URL` khi điện thoại kết nối qua Wi-Fi.
+5. Quét ảnh QR tiếng Việt hoặc Anh bằng camera điện thoại, mở liên kết và bấm ▶ nếu trình duyệt yêu cầu. Backend trả MP3 của bản dịch đã chọn, dùng lại file có sẵn. Đây là trình phát của trình duyệt điện thoại, không có trang frontend riêng.
+
+Nếu hiện vật chưa có QR, Admin tạo bằng `POST /api/admin/qrcodes` với `exhibitId` và mã tùy chọn; lấy `data.code` để làm bước 2. Admin cũng có thể lấy ảnh qua `GET /api/admin/qrcodes/{id}/image?lang=vi-vn`.
 
 Để lấy bản Việt và audio, gọi `GET /api/qrcodes/resolve/DEMO-OIL-LAMP?lang=vi-vn`; đổi thành `lang=en-us` để lấy bản Anh. Response có `id`, `imageUrl`, `languageCode`, `title`, `content`, `audioUrl` trong `data`. `audioUrl` là đường dẫn tương đối trên cùng backend; gọi đường dẫn này để nhận MP3. Backend không tự phát âm thanh từ response JSON.
 
@@ -68,7 +82,7 @@ Lần đầu gọi VoiceRSS, những lần sau dùng MP3 cục bộ. Đổi nộ
 Quản trị thông qua API có JWT:
 
 - **Hiện vật và bản dịch**: tạo/sửa/vô hiệu hóa hiện vật; thêm/sửa/xóa bản dịch. Ảnh nhận URL hoặc đường dẫn ảnh có sẵn, chưa có API upload ảnh.
-- **QR**: tạo mã tự động hoặc nhập mã riêng, gắn hiện vật, tải PNG, kích hoạt/vô hiệu hóa. Response có `qrUrl` là URL metadata được mã hóa trong PNG và `imageUrl` là đường dẫn API tải ảnh dành cho Admin.
+- **QR**: tạo mã tự động hoặc nhập mã riêng, gắn hiện vật, tải PNG, kích hoạt/vô hiệu hóa. Response có `qrUrl` là URL metadata và `imageUrl` là đường dẫn API tải ảnh dành cho Admin. Thêm `?lang=...` vào đường dẫn ảnh để tạo QR mở MP3 thay cho metadata.
 - **Tài khoản**: tạo Admin, đổi thông tin/mật khẩu, kích hoạt/vô hiệu hóa. Không được vô hiệu hóa Admin hoạt động cuối cùng. Thay đổi tài khoản thu hồi JWT cũ.
 
 ## API chính
@@ -84,6 +98,8 @@ API JSON dùng cấu trúc `{status,message,data,timestamp}`. Endpoint ảnh/aud
 | Nội dung và audio theo ID | `GET /api/exhibits/{id}?lang=en-us` | Công khai |
 | Ngôn ngữ VoiceRSS hỗ trợ | `GET /api/languages` | Công khai; dùng metadata hiện vật để biết bản dịch thực có |
 | Ảnh QR PNG | `GET /api/qrcodes/{code}/image` | QR và hiện vật đang hoạt động |
+| Ảnh QR nghe theo ngôn ngữ | `GET /api/qrcodes/{code}/image?lang=vi-vn` | Công khai; cần bản dịch tương ứng |
+| Nghe trực tiếp từ QR | `GET /api/qrcodes/{code}/audio?lang=vi-vn` | Công khai; GET/HEAD, hỗ trợ Range; cần QR, hiện vật và bản dịch đang khả dụng |
 | Phát MP3 | `GET /api/audio/play/{fileName}` | Công khai, hỗ trợ tua qua Range |
 | Đăng nhập | `POST /api/auth/login` | Công khai |
 | Hiện vật | `/api/admin/exhibits` | Admin |
@@ -93,7 +109,7 @@ API JSON dùng cấu trúc `{status,message,data,timestamp}`. Endpoint ảnh/aud
 
 Swagger mô tả phương thức và request body. Sau đăng nhập, lấy `data.token`, bấm **Authorize** và nhập JWT. Các API quản trị trả 401 nếu chưa đăng nhập, 403 nếu thiếu quyền. Hiện vật/QR không hoạt động hoặc thiếu bản dịch trả 404. VoiceRSS lỗi trả 502, thiếu khóa hoặc không lưu được file trả 503; không trả `audioUrl:null` âm thầm.
 
-Nghe thử trong Swagger: gọi API `resolve` với `code` và `lang`, lấy tên file cuối `data.audioUrl`, rồi mở nhóm **Public - Audio**, nhập `fileName` vào `GET /api/audio/play/{fileName}` và bấm **Execute**. Thanh phát MP3 xuất hiện trong Response body. API tạo bản dịch chỉ chấp nhận ngôn ngữ trong `GET /api/languages`.
+Nghe thử ngay trong Swagger: mở nhóm **Public - QR**, gọi `GET /api/qrcodes/{code}/audio` với `code` và `lang`, bấm **Execute**. Thanh phát MP3 xuất hiện trong Response body. Cách cũ vẫn dùng được: gọi `resolve`, lấy tên file cuối `data.audioUrl` rồi dùng `GET /api/audio/play/{fileName}`. API tạo bản dịch chỉ chấp nhận ngôn ngữ trong `GET /api/languages`.
 
 ## Chạy Java trực tiếp
 
@@ -117,7 +133,7 @@ Từ `qr-backend`:
 .\mvnw.cmd verify
 ```
 
-Test tự động dùng H2 với profile `test`, không dùng database DEV và không gọi VoiceRSS thật. Có kiểm thử JWT/đăng nhập, phân quyền, tài khoản, hiện vật/bản dịch, QR CRUD và giải mã PNG, seed lặp lại, lỗi VoiceRSS, audio cache và yêu cầu đồng thời, chặn đường dẫn ngoài thư mục audio. CI kiểm tra thêm Docker với MySQL/Flyway thật.
+Test tự động dùng H2 với profile `test`, không dùng database DEV và không gọi VoiceRSS thật. Có kiểm thử JWT/đăng nhập, phân quyền, tài khoản, hiện vật/bản dịch, QR CRUD và giải mã PNG metadata/audio Việt/Anh, phát MP3 trực tiếp và Range/HEAD, seed lặp lại, lỗi VoiceRSS, audio cache và yêu cầu đồng thời, chặn đường dẫn ngoài thư mục audio. CI kiểm tra thêm Docker với MySQL/Flyway thật.
 
 Kiểm tra thực tế một lượt:
 
@@ -131,6 +147,7 @@ Từ thư mục gốc, có thể kiểm tra nhanh stack và sáu audio mẫu b�
 2. Gọi `resolve` với `lang=vi-vn`, rồi `lang=en-us`: kiểm tra đúng `languageCode`, `title`, `content` và `audioUrl`. Mở URL audio trên cùng host/cổng để nghe MP3.
 3. Gọi lại cùng bản dịch: URL và file audio được dùng lại. Dừng/chạy lại Docker rồi gọi lại để xác nhận dữ liệu volume được giữ.
 4. Trong Swagger, đăng nhập và Authorize; tạo hiện vật, thêm hai bản dịch, tạo QR, tải PNG. URL giải mã từ PNG phải bằng `data.qrUrl` và trả metadata hiện vật.
+   Tải thêm PNG với `lang=vi-vn` và `lang=en-us`: URL giải mã phải kết thúc bằng `/audio?lang=vi-vn` và `/audio?lang=en-us`; quét bằng điện thoại để nghe đúng ngôn ngữ.
 5. Sửa nội dung bản dịch rồi resolve lại: có URL audio mới. Vô hiệu hóa QR hoặc hiện vật rồi gọi public API: trả 404. Thiếu bản dịch cũng trả 404.
 6. Tạo Admin thứ hai, đăng nhập thử; kiểm tra không thể khóa Admin hoạt động cuối cùng. Xóa JWT khỏi Authorize rồi gọi API admin: trả 401. JWT không có quyền Admin phải nhận 403.
 

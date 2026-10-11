@@ -2,6 +2,8 @@ package com.qraudio.backend.controller;
 
 import com.qraudio.backend.dto.*;
 import com.qraudio.backend.service.AdminQrService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,5 +30,9 @@ public class AdminQrController {
         service.deactivate(id); return ResponseEntity.noContent().build();
     }
     @GetMapping(value = "/{id}/image", produces = MediaType.IMAGE_PNG_VALUE)
-    public byte[] image(@PathVariable Long id) { return service.adminImage(id); }
+    @Operation(summary = "Tải ảnh QR của hiện vật theo ngôn ngữ", description = "Truyền lang để QR mở MP3 trực tiếp; QR và hiện vật phải đang hoạt động, có bản dịch tương ứng. Bỏ lang để lấy QR metadata.")
+    public byte[] image(@PathVariable Long id,
+                        @Parameter(example = "vi-vn") @RequestParam(required = false) String lang) {
+        return service.adminImage(id, lang);
+    }
 }

@@ -9,6 +9,7 @@ import com.qraudio.backend.repository.ExhibitRepository;
 import com.qraudio.backend.repository.ExhibitTranslationRepository;
 import com.qraudio.backend.repository.QrCodeRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.core.io.Resource;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
@@ -38,9 +39,7 @@ public class ExhibitService {
 
     public ExhibitResponse getExhibitByIdAndLang(Long id, String languageCode) {
         Exhibit exhibit = findActive(id);
-        ExhibitTranslation translation = translationRepository.findByExhibitIdAndLanguageCode(
-                        id, Languages.normalize(languageCode))
-                .orElseThrow(() -> new ResourceNotFoundException("Không có bản dịch cho ngôn ngữ: " + languageCode));
+        ExhibitTranslation translation = findTranslation(id, Languages.normalize(languageCode));
 
         String audioUrl = audioService.getOrGenerateAudio(translation);
         return new ExhibitResponse(
@@ -51,6 +50,20 @@ public class ExhibitService {
                 translation.getContent(),
                 audioUrl
         );
+    }
+
+    public Resource getAudio(Long id, String languageCode) {
+        return audioService.getOrGenerateResource(requireAudioTranslation(id, languageCode));
+    }
+
+    ExhibitTranslation requireAudioTranslation(Long id, String languageCode) {
+        findActive(id);
+        return findTranslation(id, Languages.requireSupported(languageCode));
+    }
+
+    private ExhibitTranslation findTranslation(Long id, String languageCode) {
+        return translationRepository.findByExhibitIdAndLanguageCode(id, languageCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không có bản dịch cho ngôn ngữ: " + languageCode));
     }
 
     private Exhibit findActive(Long id) {

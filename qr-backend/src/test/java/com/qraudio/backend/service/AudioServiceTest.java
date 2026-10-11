@@ -53,4 +53,16 @@ class AudioServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.getAudio("../secret.properties"));
         assertThrows(ResourceNotFoundException.class, () -> service.getAudio("audio_7_" + "a".repeat(64) + ".mp3"));
     }
+    @Test void directPlaybackAndJsonResolutionShareCacheAndRegenerateForChangedContent() throws Exception {
+        String first = service.getOrGenerateAudio(translation);
+        var resource = service.getOrGenerateResource(translation);
+        assertEquals(first.substring(first.lastIndexOf('/') + 1), resource.getFilename());
+        assertArrayEquals(new byte[]{'I','D','3',4,0}, resource.getContentAsByteArray());
+        verify(voice, times(1)).generateAudio("Xin chào", "vi-vn");
+        translation.setContent("Nội dung mới");
+        var updated = service.getOrGenerateResource(translation);
+        assertNotEquals(resource.getFilename(), updated.getFilename());
+        assertEquals("/api/audio/play/" + updated.getFilename(), service.getOrGenerateAudio(translation));
+        verify(voice, times(2)).generateAudio(anyString(), eq("vi-vn"));
+    }
 }

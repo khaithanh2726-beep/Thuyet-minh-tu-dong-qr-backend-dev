@@ -6,6 +6,7 @@ import com.qraudio.backend.entity.QrCode;
 import com.qraudio.backend.exception.ResourceNotFoundException;
 import com.qraudio.backend.repository.QrCodeRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.core.io.Resource;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -20,6 +21,15 @@ public class QrCodeService {
 
     public ExhibitResponse resolveQrCode(String code, String lang) {
         return exhibitService.getExhibitByIdAndLang(findActive(code).getExhibitId(), lang);
+    }
+
+    public Resource getAudio(String code, String lang) {
+        return exhibitService.getAudio(findActive(code).getExhibitId(), lang);
+    }
+
+    public String requireAudioLanguage(String code, String lang) {
+        return Languages.requireSupported(exhibitService.requireAudioTranslation(
+                findActive(code).getExhibitId(), lang).getLanguageCode());
     }
 
     @Transactional(readOnly = true)

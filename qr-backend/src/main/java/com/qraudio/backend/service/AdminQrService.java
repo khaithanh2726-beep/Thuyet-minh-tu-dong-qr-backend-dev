@@ -47,9 +47,15 @@ public class AdminQrService {
     }
     @Transactional
     public void deactivate(Long id) { QrCode qr = find(id); qr.setActive(false); codes.saveAndFlush(qr); }
-    public byte[] adminImage(Long id) { return image(find(id).getCode()); }
-    public byte[] publicImage(String code) {
-        QrCode qr = publicQr.findActive(code); requireActiveExhibit(qr.getExhibitId()); return image(qr.getCode());
+    public byte[] adminImage(Long id, String lang) { return imageForLanguage(find(id).getCode(), lang); }
+    public byte[] publicImage(String code, String lang) {
+        QrCode qr = publicQr.findActive(code); requireActiveExhibit(qr.getExhibitId());
+        return imageForLanguage(qr.getCode(), lang);
+    }
+    private byte[] imageForLanguage(String code, String lang) {
+        String target = lang == null ? urls.qrMetadata(code)
+                : urls.qrAudio(code, publicQr.requireAudioLanguage(code, lang));
+        return image(target);
     }
     private void requireExhibit(Long id) {
         if (!exhibits.existsById(id)) throw new ResourceNotFoundException("Không tìm thấy hiện vật");
@@ -63,9 +69,9 @@ public class AdminQrService {
         return new QrResponse(qr.getId(), qr.getExhibitId(), qr.getCode(), qr.isActive(), qr.getCreatedAt(),
                 urls.qrMetadata(qr.getCode()), "/api/admin/qrcodes/" + qr.getId() + "/image");
     }
-    private byte[] image(String code) {
+    private byte[] image(String target) {
         try {
-            var matrix = new MultiFormatWriter().encode(urls.qrMetadata(code), BarcodeFormat.QR_CODE, 480, 480,
+            var matrix = new MultiFormatWriter().encode(target, BarcodeFormat.QR_CODE, 480, 480,
                     Map.of(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M, EncodeHintType.MARGIN, 4));
             var output = new ByteArrayOutputStream(); MatrixToImageWriter.writeToStream(matrix, "PNG", output);
             return output.toByteArray();

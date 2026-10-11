@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -21,7 +22,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
-            MethodArgumentTypeMismatchException.class})
+            MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ApiResponse<Void>> handleInvalidRequest(Exception ex) {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error(400, "Dữ liệu gửi lên không hợp lệ"));

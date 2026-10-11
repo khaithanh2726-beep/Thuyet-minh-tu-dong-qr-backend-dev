@@ -33,6 +33,12 @@ public class AudioService {
         catch (IOException exception) { throw storageError(exception); }
     }
     public String getOrGenerateAudio(ExhibitTranslation translation) {
+        return url(getOrGenerateFilename(translation));
+    }
+    public Resource getOrGenerateResource(ExhibitTranslation translation) {
+        return getAudio(getOrGenerateFilename(translation));
+    }
+    private String getOrGenerateFilename(ExhibitTranslation translation) {
         String language = Languages.requireSupported(translation.getLanguageCode());
         String hash = hash(language + "\n" + translation.getContent());
         String filename = "audio_" + translation.getId() + "_" + hash + ".mp3";
@@ -40,7 +46,7 @@ public class AudioService {
             AudioAsset asset = assets.findByTranslationIdAndContentHashAndFormat(
                     translation.getId(), hash, "MP3").orElse(null);
             if (asset != null && validFile(safePath(asset.getStorageKey()))) {
-                return url(asset.getStorageKey());
+                return asset.getStorageKey();
             }
             Path target = safePath(filename);
             if (!validFile(target)) {
@@ -68,7 +74,7 @@ public class AudioService {
             asset.setFormat("MP3");
             asset.setStorageKey(filename);
             assets.saveAndFlush(asset);
-            return url(filename);
+            return filename;
         }
     }
     public Resource getAudio(String filename) {
