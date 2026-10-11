@@ -1,26 +1,31 @@
 server:
   port: ${SERVER_PORT:8080}
-voicerss:
-  api-key: "d11db342b5cb4dc6bba9b5564d212d17"
-  url: http://api.voicerss.org/
 spring:
   application:
     name: qr-backend
+  config:
+    import: optional:file:./dev-local.properties
   datasource:
-    url: jdbc:mysql://localhost:3306/qr_audio_backend_dev?serverTimezone=UTC&sslMode=DISABLED
-    username: root
-    password: Infineti2006.
+    url: ${DB_URL:jdbc:mysql://localhost:3306/qr_audio_backend_dev?serverTimezone=UTC&sslMode=DISABLED}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: validate
     properties:
-      hibernate:
-        jdbc:
-          time_zone: UTC
+      hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
 security:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+voicerss:
+  api-key: ${VOICERSS_API_KEY:}
+  url: https://api.voicerss.org/
+audio:
+  storage-dir: ${AUDIO_STORAGE_DIR:audio_cache}
+app:
+  public-base-url: ${PUBLIC_BASE_URL:}
+  seed-demo-data: ${SEED_DEMO_DATA:false}
