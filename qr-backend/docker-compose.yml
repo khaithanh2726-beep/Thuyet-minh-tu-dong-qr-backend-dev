@@ -1,37 +1,52 @@
-version: '3.8'
-
+name: qr-audio-mvp
 services:
-  # Cấu hình Database
   db:
-    image: mysql:8.0
-    container_name: qr-mysql
+    image: mysql:8.4
+    restart: unless-stopped
     environment:
       MYSQL_DATABASE: qr_audio_backend_dev
-      MYSQL_ROOT_PASSWORD: Infineti2006.
+      MYSQL_USER: qr_app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run Initialize-Dev.ps1 first}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run Initialize-Dev.ps1 first}
     ports:
-      - "3307:3306"
+      - "127.0.0.1:${MYSQL_PORT:-3308}:3306"
     volumes:
-      - db_data:/var/lib/mysql
+      - mysql_mvp_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h 127.0.0.1 -u qr_app -D qr_audio_backend_dev -e 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
-  #Cấu hình Backend
+      retries: 20
+      start_period: 30s
   app:
-    build: .
-    container_name: qr-backend-app
-    ports:
-      - "8080:8080"
+    image: ${APP_IMAGE:-qr-audio-backend:dev}
+    build:
+      context: .
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/qr_audio_db?useSSL=false&allowPublicKeyRetrieval=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=root
-      - JWT_SECRET=${JWT_SECRET:?Can thiet lap JWT_SECRET truoc khi chay Docker Compose}
-
+      DB_URL: jdbc:mysql://db:3306/qr_audio_backend_dev?serverTimezone=UTC&sslMode=DISABLED&allowPublicKeyRetrieval=true
+      DB_USERNAME: qr_app
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Run Initialize-Dev.ps1 first}
+      VOICERSS_API_KEY: ${VOICERSS_API_KEY:-}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-admin}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?Run Initialize-Dev.ps1 first}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      AUDIO_STORAGE_DIR: /app/audio_cache
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      - audio_mvp_data:/app/audio_cache
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
 volumes:
-  db_data:
+  mysql_mvp_data:
+  audio_mvp_data:

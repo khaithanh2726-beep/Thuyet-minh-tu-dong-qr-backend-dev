@@ -1,0 +1,7 @@
+target
+audio_cache
+dev-local.properties
+.env
+.env.*
+.git
+.vscode

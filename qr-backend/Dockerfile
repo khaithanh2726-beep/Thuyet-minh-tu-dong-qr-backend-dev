@@ -1,22 +1,17 @@
-# Sử dụng môi trường Java 21 chính thức làm nền tảng
-FROM eclipse-temurin:21-jdk-alpine
-
-# Thiết lập thư mục làm việc bên trong container
-WORKDIR /app
-
-# Copy thư mục mã nguồn và file cấu hình Maven vào container
-COPY .mvn/ .mvn
+FROM eclipse-temurin:21-jdk-alpine AS build
+WORKDIR /build
+COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-COPY src ./src
-
-# Đảm bảo file mvnw có quyền thực thi
 RUN chmod +x mvnw
+COPY src/ src/
+RUN --mount=type=cache,target=/root/.m2 ./mvnw -B -DskipTests package
 
-# Yêu cầu Maven tải thư viện và biên dịch
-RUN ./mvnw clean package -Dmaven.test.skip=true
-
-# Mở cổng 8080 để giao tiếp với bên ngoài
+FROM eclipse-temurin:21-jre-alpine
+LABEL org.opencontainers.image.source="https://github.com/khaithanh2726-beep/Thuyet-minh-tu-dong-qr-backend-dev"
+RUN apk add --no-cache curl && addgroup -S app && adduser -S app -G app \
+    && mkdir -p /app/audio_cache && chown -R app:app /app
+WORKDIR /app
+COPY --from=build --chown=app:app /build/target/qr-backend-0.0.1-SNAPSHOT.jar app.jar
+USER app
 EXPOSE 8080
-
-# Lệnh khởi chạy ứng dụng khi container bắt đầu
-CMD ["java", "-jar", "target/qr-backend-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
