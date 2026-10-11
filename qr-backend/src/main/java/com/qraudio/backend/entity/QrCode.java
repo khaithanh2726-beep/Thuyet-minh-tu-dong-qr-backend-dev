@@ -10,9 +10,13 @@ public class QrCode {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;                 // Id QR
     private Long exhibitId;          // Id hiện vật
+    @Column(nullable = false, unique = true, length = 80)
     private String code;             // Chuỗi mã QR
     private boolean isActive;        // Trạng thái (true: đang hoạt động, false: vô hiệu hóa)
     private LocalDateTime createdAt; // Ngày tạo mã
+
+    @PrePersist
+    void onCreate() { if (createdAt == null) createdAt = LocalDateTime.now(java.time.ZoneOffset.UTC); }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

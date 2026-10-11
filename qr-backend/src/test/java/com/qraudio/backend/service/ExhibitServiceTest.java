@@ -6,17 +6,17 @@ import com.qraudio.backend.entity.ExhibitTranslation;
 import com.qraudio.backend.exception.ResourceNotFoundException;
 import com.qraudio.backend.repository.ExhibitRepository;
 import com.qraudio.backend.repository.ExhibitTranslationRepository;
-import com.qraudio.backend.service.AudioService;
-import com.qraudio.backend.service.ExhibitService;
-import org.junit.jupiter.api.BeforeEach;
+import com.qraudio.backend.repository.QrCodeRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class ExhibitServiceTest {
     @Mock
     private ExhibitRepository exhibitRepository;
@@ -24,13 +24,10 @@ class ExhibitServiceTest {
     private ExhibitTranslationRepository translationRepository;
     @Mock
     private AudioService audioService;
+    @Mock
+    private QrCodeRepository qrCodes;
     @InjectMocks
     private ExhibitService exhibitService;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
-    }
 
     @Test
     void getExhibitByIdAndLang_Success() {
@@ -54,8 +51,8 @@ class ExhibitServiceTest {
         // Gọi hàm và kiểm tra
         ExhibitResponse response = exhibitService.getExhibitByIdAndLang(exhibitId, lang);
         assertNotNull(response);
-        assertEquals("Bảo vật quốc gia", response.getTitle());
-        assertEquals("/api/audio/play/mock.mp3", response.getAudioUrl());
+        assertEquals("Bảo vật quốc gia", response.title());
+        assertEquals("/api/audio/play/mock.mp3", response.audioUrl());
     }
 
     @Test

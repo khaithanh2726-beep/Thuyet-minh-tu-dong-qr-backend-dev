@@ -177,6 +177,16 @@ class AdminExhibitControllerIntegrationTest {
     }
 
     @Test
+    void unsupportedLanguage_IsRejectedBeforeSavingTranslation() throws Exception {
+        mvc.perform(post(adminPath() + "/translations").header("Authorization", bearer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(translationJson("xx-xx", "Title", "Content")))
+                .andExpect(status().isBadRequest());
+        assertFalse(translations.existsByExhibitIdAndLanguageCode(exhibit.getId(), "xx-xx"));
+        verifyNoInteractions(audio);
+    }
+
+    @Test
     void malformedOrIncompleteTranslation_Returns400() throws Exception {
         for (String invalid : new String[]{translationJson("vi", "Title", "Content"),
                 translationJson("en-us", " ", "Content"), translationJson("en-us", "Title", " "),

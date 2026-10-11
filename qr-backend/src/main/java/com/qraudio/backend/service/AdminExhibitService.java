@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Locale;
 
 @Service
 public class AdminExhibitService {
@@ -81,13 +80,13 @@ public class AdminExhibitService {
     @Transactional(readOnly = true)
     public TranslationResponse getTranslation(Long exhibitId, String languageCode) {
         findExhibit(exhibitId);
-        return TranslationResponse.from(findTranslation(exhibitId, normalizeLanguageCode(languageCode)));
+        return TranslationResponse.from(findTranslation(exhibitId, Languages.normalize(languageCode)));
     }
 
     @Transactional
     public TranslationResponse createTranslation(Long exhibitId, CreateTranslationRequest request) {
         lockExhibit(exhibitId);
-        String language = normalizeLanguageCode(request.languageCode());
+        String language = Languages.requireSupported(request.languageCode());
         validateContent(request.content());
         if (translations.existsByExhibitIdAndLanguageCode(exhibitId, language)) {
             throw new ApiException(HttpStatus.CONFLICT, "Hiện vật đã có bản dịch cho ngôn ngữ này");
@@ -104,7 +103,7 @@ public class AdminExhibitService {
     public TranslationResponse updateTranslation(Long exhibitId, String languageCode,
                                                   UpdateTranslationRequest request) {
         lockExhibit(exhibitId);
-        ExhibitTranslation translation = findTranslation(exhibitId, normalizeLanguageCode(languageCode));
+        ExhibitTranslation translation = findTranslation(exhibitId, Languages.normalize(languageCode));
         validateContent(request.content());
         if (!request.content().equals(translation.getContent())) {
             // Local file cleanup belongs to the audio lifecycle.
@@ -119,7 +118,7 @@ public class AdminExhibitService {
     @Transactional
     public void deleteTranslation(Long exhibitId, String languageCode) {
         lockExhibit(exhibitId);
-        ExhibitTranslation translation = findTranslation(exhibitId, normalizeLanguageCode(languageCode));
+        ExhibitTranslation translation = findTranslation(exhibitId, Languages.normalize(languageCode));
         audioAssets.deleteByTranslationId(translation.getId());
         // Flush children first to respect MySQL's foreign key.
         audioAssets.flush();
@@ -140,13 +139,6 @@ public class AdminExhibitService {
     private ExhibitTranslation findTranslation(Long exhibitId, String language) {
         return translations.findByExhibitIdAndLanguageCode(exhibitId, language).orElseThrow(
                 () -> new ResourceNotFoundException("Không tìm thấy bản dịch của hiện vật"));
-    }
-
-    private String normalizeLanguageCode(String languageCode) {
-        if (languageCode == null || !languageCode.matches("[a-zA-Z]{2}-[a-zA-Z]{2}")) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Mã ngôn ngữ phải có dạng vi-vn hoặc en-us");
-        }
-        return languageCode.toLowerCase(Locale.ROOT);
     }
 
     private String normalizeImageUrl(String imageUrl) {
